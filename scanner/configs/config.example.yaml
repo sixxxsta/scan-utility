@@ -1,0 +1,54 @@
+targets:
+  ranges:
+    - "203.0.113.0/24"
+  asns: []
+
+ports: "22,80,443,3306,8080"
+
+masscan:
+  path: "masscan"
+  rate: 1000
+  banners: true
+  wait: 10
+
+nmap:
+  enabled: true
+  path: "nmap"
+  args: ["-sV", "-Pn", "--version-light"]
+
+persistence:
+  sqlite_path: "data/scan.db"
+
+notifications:
+  telegram:
+    enabled: false
+    bot_token_env: "TELEGRAM_BOT_TOKEN"
+    chat_id_env: "TELEGRAM_CHAT_ID"
+  email:
+    enabled: false
+    smtp_host: "smtp.example.com"
+    smtp_port: 587
+    username: ""
+    password_env: "SMTP_PASSWORD"
+    from: "scan@example.com"
+    to:
+      - "owner@example.com"
+
+vulners:
+  enabled: false
+  api_key_env: "VULNERS_API_KEY"
+  base_url: "https://vulners.com/api/v3"
+
+exploitdb:
+  enabled: true
+  index_path: "data/exploitdb-index.json"
+
+schedule:
+  cron: ""
+
+server:
+  listen: ":8080"
+
+workers: 8
+notify_closed: false
+dry_run: false
