@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Host {{.IP}} — Scan Utility</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">Scan Utility</div>
+    <nav>
+      <a href="/">Runs</a>
+      <a href="/findings">Findings</a>
+    </nav>
+  </header>
+  <main>
+    <section class="card">
+      <h1>Host {{.IP}}</h1>
+      {{range .Findings}}
+      <article class="finding">
+        <h2 class="mono">{{.Port}}/{{.Proto}} <span class="badge">{{.State}}</span></h2>
+        <p>service: <strong>{{.Service}}</strong> — {{.Product}} {{.Version}}</p>
+        <p class="mono">{{.Banner}}</p>
+        {{if .CVEs}}
+        <h3>CVEs</h3>
+        <ul>
+          {{range .CVEs}}
+          <li><code>{{.CVEID}}</code> ({{printf "%.1f" .CVSS}}) — {{.Summary}}</li>
+          {{end}}
+        </ul>
+        {{end}}
+        {{if .Exploits}}
+        <h3>Exploits</h3>
+        <ul>
+          {{range .Exploits}}
+          <li><a href="{{.URL}}" target="_blank" rel="noopener">EDB-{{.EDBID}}</a> — {{.Title}}</li>
+          {{end}}
+        </ul>
+        {{end}}
+      </article>
+      {{else}}
+      <p>No findings for this host.</p>
+      {{end}}
+    </section>
+  </main>
+</body>
+</html>

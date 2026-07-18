@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Findings — Scan Utility</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">Scan Utility</div>
+    <nav>
+      <a href="/">Runs</a>
+      <a href="/findings">Findings</a>
+    </nav>
+  </header>
+  <main>
+    <section class="card">
+      <h1>Findings</h1>
+      <form class="filters" method="get" action="/findings">
+        <label><input type="checkbox" name="open" value="1" {{if .Filter.OnlyOpen}}checked{{end}}> open</label>
+        <label><input type="checkbox" name="new" value="1" {{if .Filter.OnlyNew}}checked{{end}}> new</label>
+        <label><input type="checkbox" name="cve" value="1" {{if .Filter.HasCVE}}checked{{end}}> has CVE</label>
+        <label><input type="checkbox" name="exploit" value="1" {{if .Filter.HasExploit}}checked{{end}}> has exploit</label>
+        <input type="text" name="ip" placeholder="IP filter" value="{{.Filter.IP}}">
+        <button type="submit">Filter</button>
+      </form>
+      <table>
+        <thead>
+          <tr>
+            <th>Host</th>
+            <th>Port</th>
+            <th>Service</th>
+            <th>Product</th>
+            <th>Banner</th>
+            <th>CVE</th>
+            <th>Exploits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Findings}}
+          <tr>
+            <td><a href="/hosts/{{.IP}}">{{.IP}}</a></td>
+            <td class="mono">{{.Port}}/{{.Proto}}</td>
+            <td>{{.Service}}</td>
+            <td>{{.Product}} {{.Version}}</td>
+            <td class="truncate">{{.Banner}}</td>
+            <td>{{len .CVEs}}</td>
+            <td>{{len .Exploits}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="7">No findings</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

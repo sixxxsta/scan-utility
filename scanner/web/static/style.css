@@ -1,0 +1,80 @@
+:root {
+  --bg: #121417;
+  --panel: #1c2128;
+  --text: #e6e6e6;
+  --muted: #9aa3ad;
+  --accent: #4c8bf5;
+  --ok: #3cba74;
+  --warn: #d4a017;
+  --bad: #e05d5d;
+  --line: #2d333b;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  background: #0e1114;
+  position: sticky;
+  top: 0;
+}
+.brand { font-weight: 700; }
+nav { display: flex; gap: 1rem; flex: 1; }
+button, .filters button {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 4px;
+  padding: 0.45rem 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1rem;
+}
+h1, h2, h3 { margin-top: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.5rem 0.35rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+.mono { font-family: Consolas, monospace; }
+.truncate { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: #2a3139;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.badge.completed { color: var(--ok); }
+.badge.failed { color: var(--bad); }
+.badge.running { color: var(--warn); }
+.filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
+.filters input[type="text"] {
+  background: #101419;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.4rem 0.55rem;
+}
+.finding { border-top: 1px solid var(--line); padding-top: 1rem; margin-top: 1rem; }
+#statusLine { color: var(--muted); }

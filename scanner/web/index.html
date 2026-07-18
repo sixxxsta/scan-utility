@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scan Utility</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">Scan Utility</div>
+    <nav>
+      <a href="/">Runs</a>
+      <a href="/findings">Findings</a>
+    </nav>
+    <button id="scanBtn" type="button">Run scan now</button>
+  </header>
+
+  <main>
+    <section class="status card">
+      <h1>Dashboard</h1>
+      <p id="statusLine">
+        {{if .Status.Running}}Running: {{.Status.Message}}{{else}}Idle{{end}}
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Recent scan runs</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Started</th>
+            <th>Status</th>
+            <th>Open</th>
+            <th>New</th>
+            <th>Closed</th>
+            <th>Targets</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Runs}}
+          <tr>
+            <td>{{.ID}}</td>
+            <td>{{.StartedAt.Format "2006-01-02 15:04:05"}}</td>
+            <td><span class="badge {{.Status}}">{{.Status}}</span></td>
+            <td>{{.OpenCount}}</td>
+            <td>{{.NewCount}}</td>
+            <td>{{.ClosedCount}}</td>
+            <td class="mono truncate">{{.Targets}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="7">No scans yet</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
