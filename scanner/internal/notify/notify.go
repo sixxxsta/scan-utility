@@ -89,6 +89,12 @@ func FormatFinding(f models.Finding) string {
 	if f.Product != "" || f.Version != "" {
 		fmt.Fprintf(&b, "product: %s %s\n", f.Product, f.Version)
 	}
+	if f.ValidationStatus != "" && f.ValidationStatus != models.ValidationNone {
+		fmt.Fprintf(&b, "validation: %s\n", f.ValidationStatus)
+		if f.NSEScripts != "" {
+			fmt.Fprintf(&b, "nse: %s\n", f.NSEScripts)
+		}
+	}
 	if f.Banner != "" {
 		fmt.Fprintf(&b, "banner: %s\n", truncate(f.Banner, 200))
 	}

@@ -63,6 +63,7 @@ func (s *Server) handleFindingsPage(w http.ResponseWriter, r *http.Request) {
 		OnlyNew:    q.Get("new") == "1",
 		HasCVE:     q.Get("cve") == "1",
 		HasExploit: q.Get("exploit") == "1",
+		Validation: q.Get("validation"),
 		IP:         q.Get("ip"),
 		Limit:      200,
 	}
@@ -104,6 +105,7 @@ func (s *Server) handleFindings(w http.ResponseWriter, r *http.Request) {
 		OnlyNew:    q.Get("new") == "1",
 		HasCVE:     q.Get("cve") == "1",
 		HasExploit: q.Get("exploit") == "1",
+		Validation: q.Get("validation"),
 		IP:         q.Get("ip"),
 		Limit:      limit,
 	}

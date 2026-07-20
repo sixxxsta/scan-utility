@@ -13,6 +13,7 @@ type Config struct {
 	Ports         string              `yaml:"ports"`
 	Masscan       MasscanConfig       `yaml:"masscan"`
 	Nmap          NmapConfig          `yaml:"nmap"`
+	NSE           NSEConfig           `yaml:"nse"`
 	Persistence   PersistenceConfig   `yaml:"persistence"`
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Vulners       VulnersConfig       `yaml:"vulners"`
@@ -40,6 +41,19 @@ type NmapConfig struct {
 	Enabled bool     `yaml:"enabled"`
 	Path    string   `yaml:"path"`
 	Args    []string `yaml:"args"`
+}
+
+type NSEConfig struct {
+	Enabled bool `yaml:"enabled"`
+	Auto    *bool `yaml:"auto"`
+	Scripts map[string][]string `yaml:"scripts"`
+}
+
+func (n NSEConfig) AutoEnabled() bool {
+	if n.Auto == nil {
+		return true
+	}
+	return *n.Auto
 }
 
 type PersistenceConfig struct {
@@ -74,8 +88,9 @@ type VulnersConfig struct {
 }
 
 type ExploitDBConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	IndexPath string `yaml:"index_path"`
+	Enabled    bool   `yaml:"enabled"`
+	Path       string `yaml:"path"`
+	MaxResults int    `yaml:"max_results"`
 }
 
 type ScheduleConfig struct {
@@ -115,6 +130,9 @@ func Default() *Config {
 			Path:    "nmap",
 			Args:    []string{"-sV", "-Pn", "--version-light"},
 		},
+		NSE: NSEConfig{
+			Enabled: true,
+		},
 		Persistence: PersistenceConfig{
 			SQLitePath: "data/scan.db",
 		},
@@ -133,7 +151,8 @@ func Default() *Config {
 			BaseURL:   "https://vulners.com/api/v3",
 		},
 		ExploitDB: ExploitDBConfig{
-			IndexPath: "data/exploitdb-index.json",
+			Path:       "searchsploit",
+			MaxResults: 5,
 		},
 		Schedule: ScheduleConfig{},
 		Server: ServerConfig{

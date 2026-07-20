@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS findings (
 	first_seen TEXT NOT NULL,
 	last_seen TEXT NOT NULL,
 	is_open INTEGER NOT NULL DEFAULT 1,
+	validation_status TEXT DEFAULT 'none',
+	nse_scripts TEXT DEFAULT '',
+	nse_output TEXT DEFAULT '',
 	UNIQUE(ip, port, proto)
 );
 
@@ -109,9 +112,38 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS idx_findings_open ON findings(is_open);
 CREATE INDEX IF NOT EXISTS idx_findings_ip ON findings(ip);
+CREATE INDEX IF NOT EXISTS idx_findings_validation ON findings(validation_status);
 `
-	_, err := s.db.ExecContext(ctx, schema)
-	return err
+	if _, err := s.db.ExecContext(ctx, schema); err != nil {
+		return err
+	}
+	return s.ensureFindingColumns(ctx)
+}
+
+func (s *Store) ensureFindingColumns(ctx context.Context) error {
+	cols := []struct {
+		name string
+		ddl  string
+	}{
+		{"validation_status", `ALTER TABLE findings ADD COLUMN validation_status TEXT DEFAULT 'none'`},
+		{"nse_scripts", `ALTER TABLE findings ADD COLUMN nse_scripts TEXT DEFAULT ''`},
+		{"nse_output", `ALTER TABLE findings ADD COLUMN nse_output TEXT DEFAULT ''`},
+	}
+	for _, c := range cols {
+		var n int
+		err := s.db.QueryRowContext(ctx,
+			`SELECT COUNT(1) FROM pragma_table_info('findings') WHERE name=?`, c.name).Scan(&n)
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			continue
+		}
+		if _, err := s.db.ExecContext(ctx, c.ddl); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) CreateRun(ctx context.Context, targets, ports string) (*models.ScanRun, error) {
@@ -296,15 +328,20 @@ ON CONFLICT(ip, port, proto) DO UPDATE SET
 }
 
 func (s *Store) UpdateFindingEnrichment(ctx context.Context, f models.Finding) error {
+	status := f.ValidationStatus
+	if status == "" {
+		status = models.ValidationNone
+	}
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE findings SET service=?, banner=?, product=?, version=?, last_seen=? WHERE id=?`,
-		f.Service, f.Banner, f.Product, f.Version, f.LastSeen.Format(time.RFC3339Nano), f.ID,
+		`UPDATE findings SET service=?, banner=?, product=?, version=?, last_seen=?, validation_status=?, nse_scripts=?, nse_output=? WHERE id=?`,
+		f.Service, f.Banner, f.Product, f.Version, f.LastSeen.Format(time.RFC3339Nano),
+		status, f.NSEScripts, f.NSEOutput, f.ID,
 	)
 	return err
 }
 
 func (s *Store) ListOpenFindings(ctx context.Context) ([]models.Finding, error) {
-	return s.queryFindings(ctx, `SELECT id, ip, port, proto, state, service, banner, product, version, first_seen, last_seen, is_open FROM findings WHERE is_open=1`)
+	return s.queryFindings(ctx, `SELECT id, ip, port, proto, state, service, banner, product, version, first_seen, last_seen, is_open, validation_status, nse_scripts, nse_output FROM findings WHERE is_open=1`)
 }
 
 func (s *Store) ListFindings(ctx context.Context, filter FindingFilter) ([]models.Finding, error) {
@@ -320,7 +357,11 @@ func (s *Store) ListFindings(ctx context.Context, filter FindingFilter) ([]model
 		clauses = append(clauses, "ip=?")
 		args = append(args, filter.IP)
 	}
-	q := `SELECT id, ip, port, proto, state, service, banner, product, version, first_seen, last_seen, is_open FROM findings`
+	if filter.Validation != "" {
+		clauses = append(clauses, "validation_status=?")
+		args = append(args, filter.Validation)
+	}
+	q := `SELECT id, ip, port, proto, state, service, banner, product, version, first_seen, last_seen, is_open, validation_status, nse_scripts, nse_output FROM findings`
 	if len(clauses) > 0 {
 		q += " WHERE " + strings.Join(clauses, " AND ")
 	}
@@ -337,12 +378,6 @@ func (s *Store) ListFindings(ctx context.Context, filter FindingFilter) ([]model
 		exps, _ := s.ListExploits(ctx, findings[i].ID)
 		findings[i].CVEs = cves
 		findings[i].Exploits = exps
-		if filter.HasCVE && len(cves) == 0 {
-			continue
-		}
-		if filter.HasExploit && len(exps) == 0 {
-			continue
-		}
 	}
 	if filter.HasCVE || filter.HasExploit {
 		var filtered []models.Finding
@@ -365,6 +400,7 @@ type FindingFilter struct {
 	OnlyNew    bool
 	HasCVE     bool
 	HasExploit bool
+	Validation string
 	IP         string
 	Limit      int
 }
@@ -380,12 +416,20 @@ func (s *Store) queryFindings(ctx context.Context, q string, args ...any) ([]mod
 		var f models.Finding
 		var first, last string
 		var open int
-		if err := rows.Scan(&f.ID, &f.IP, &f.Port, &f.Proto, &f.State, &f.Service, &f.Banner, &f.Product, &f.Version, &first, &last, &open); err != nil {
+		var status, scripts, output sql.NullString
+		if err := rows.Scan(&f.ID, &f.IP, &f.Port, &f.Proto, &f.State, &f.Service, &f.Banner, &f.Product, &f.Version, &first, &last, &open, &status, &scripts, &output); err != nil {
 			return nil, err
 		}
 		f.FirstSeen, _ = time.Parse(time.RFC3339Nano, first)
 		f.LastSeen, _ = time.Parse(time.RFC3339Nano, last)
 		f.IsOpen = open == 1
+		if status.Valid && status.String != "" {
+			f.ValidationStatus = models.ValidationStatus(status.String)
+		} else {
+			f.ValidationStatus = models.ValidationNone
+		}
+		f.NSEScripts = scripts.String
+		f.NSEOutput = output.String
 		out = append(out, f)
 	}
 	return out, rows.Err()

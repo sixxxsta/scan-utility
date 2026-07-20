@@ -22,6 +22,13 @@
         <label><input type="checkbox" name="new" value="1" {{if .Filter.OnlyNew}}checked{{end}}> new</label>
         <label><input type="checkbox" name="cve" value="1" {{if .Filter.HasCVE}}checked{{end}}> has CVE</label>
         <label><input type="checkbox" name="exploit" value="1" {{if .Filter.HasExploit}}checked{{end}}> has exploit</label>
+        <select name="validation">
+          <option value="">validation: any</option>
+          <option value="validated" {{if eq .Filter.Validation "validated"}}selected{{end}}>validated</option>
+          <option value="not_confirmed" {{if eq .Filter.Validation "not_confirmed"}}selected{{end}}>not_confirmed</option>
+          <option value="skipped" {{if eq .Filter.Validation "skipped"}}selected{{end}}>skipped</option>
+          <option value="error" {{if eq .Filter.Validation "error"}}selected{{end}}>error</option>
+        </select>
         <input type="text" name="ip" placeholder="IP filter" value="{{.Filter.IP}}">
         <button type="submit">Filter</button>
       </form>
@@ -32,6 +39,7 @@
             <th>Port</th>
             <th>Service</th>
             <th>Product</th>
+            <th>Validation</th>
             <th>Banner</th>
             <th>CVE</th>
             <th>Exploits</th>
@@ -44,12 +52,13 @@
             <td class="mono">{{.Port}}/{{.Proto}}</td>
             <td>{{.Service}}</td>
             <td>{{.Product}} {{.Version}}</td>
+            <td><span class="badge {{.ValidationStatus}}">{{.ValidationStatus}}</span></td>
             <td class="truncate">{{.Banner}}</td>
             <td>{{len .CVEs}}</td>
             <td>{{len .Exploits}}</td>
           </tr>
           {{else}}
-          <tr><td colspan="7">No findings</td></tr>
+          <tr><td colspan="8">No findings</td></tr>
           {{end}}
         </tbody>
       </table>

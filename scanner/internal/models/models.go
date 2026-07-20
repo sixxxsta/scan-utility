@@ -23,6 +23,16 @@ const (
 	DiffUnchanged DiffKind = "unchanged"
 )
 
+type ValidationStatus string
+
+const (
+	ValidationNone         ValidationStatus = "none"
+	ValidationSkipped      ValidationStatus = "skipped"
+	ValidationValidated    ValidationStatus = "validated"
+	ValidationNotConfirmed ValidationStatus = "not_confirmed"
+	ValidationError        ValidationStatus = "error"
+)
+
 type ScanRun struct {
 	ID          int64      `json:"id"`
 	StartedAt   time.Time  `json:"started_at"`
@@ -37,21 +47,24 @@ type ScanRun struct {
 }
 
 type Finding struct {
-	ID        int64     `json:"id"`
-	IP        string    `json:"ip"`
-	Port      int       `json:"port"`
-	Proto     string    `json:"proto"`
-	State     string    `json:"state"`
-	Service   string    `json:"service"`
-	Banner    string    `json:"banner"`
-	Product   string    `json:"product"`
-	Version   string    `json:"version"`
-	FirstSeen time.Time `json:"first_seen"`
-	LastSeen  time.Time `json:"last_seen"`
-	IsOpen    bool      `json:"is_open"`
-	Diff      DiffKind  `json:"diff,omitempty"`
-	CVEs      []CVE     `json:"cves,omitempty"`
-	Exploits  []Exploit `json:"exploits,omitempty"`
+	ID                 int64            `json:"id"`
+	IP                 string           `json:"ip"`
+	Port               int              `json:"port"`
+	Proto              string           `json:"proto"`
+	State              string           `json:"state"`
+	Service            string           `json:"service"`
+	Banner             string           `json:"banner"`
+	Product            string           `json:"product"`
+	Version            string           `json:"version"`
+	FirstSeen          time.Time        `json:"first_seen"`
+	LastSeen           time.Time        `json:"last_seen"`
+	IsOpen             bool             `json:"is_open"`
+	Diff               DiffKind         `json:"diff,omitempty"`
+	ValidationStatus   ValidationStatus `json:"validation_status"`
+	NSEScripts         string           `json:"nse_scripts,omitempty"`
+	NSEOutput          string           `json:"nse_output,omitempty"`
+	CVEs               []CVE            `json:"cves,omitempty"`
+	Exploits           []Exploit        `json:"exploits,omitempty"`
 }
 
 func (f Finding) Key() string {

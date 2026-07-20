@@ -68,6 +68,21 @@ th { color: var(--muted); font-weight: 600; }
 .badge.completed { color: var(--ok); }
 .badge.failed { color: var(--bad); }
 .badge.running { color: var(--warn); }
+.badge.validated { color: var(--bad); background: rgba(224, 93, 93, 0.15); }
+.badge.not_confirmed { color: var(--warn); }
+.badge.skipped { color: var(--muted); }
+.badge.error { color: var(--bad); }
+.badge.none { color: var(--muted); }
+pre.nse {
+  background: #101419;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.75rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: Consolas, monospace;
+  font-size: 0.85rem;
+}
 .filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
 .filters input[type="text"] {
   background: #101419;

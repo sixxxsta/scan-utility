@@ -16,6 +16,9 @@ nmap:
   path: "nmap"
   args: ["-sV", "-Pn", "--version-light"]
 
+nse:
+  enabled: true
+
 persistence:
   sqlite_path: "data/scan.db"
 
@@ -40,8 +43,9 @@ vulners:
   base_url: "https://vulners.com/api/v3"
 
 exploitdb:
-  enabled: true
-  index_path: "data/exploitdb-index.json"
+  enabled: false
+  path: "searchsploit"
+  max_results: 5
 
 schedule:
   cron: ""

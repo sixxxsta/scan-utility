@@ -19,9 +19,16 @@
       <h1>Host {{.IP}}</h1>
       {{range .Findings}}
       <article class="finding">
-        <h2 class="mono">{{.Port}}/{{.Proto}} <span class="badge">{{.State}}</span></h2>
+        <h2 class="mono">{{.Port}}/{{.Proto}} <span class="badge">{{.State}}</span> <span class="badge {{.ValidationStatus}}">{{.ValidationStatus}}</span></h2>
         <p>service: <strong>{{.Service}}</strong> — {{.Product}} {{.Version}}</p>
         <p class="mono">{{.Banner}}</p>
+        {{if .NSEScripts}}
+        <p>NSE scripts: <code>{{.NSEScripts}}</code></p>
+        {{end}}
+        {{if .NSEOutput}}
+        <h3>NSE output</h3>
+        <pre class="nse">{{.NSEOutput}}</pre>
+        {{end}}
         {{if .CVEs}}
         <h3>CVEs</h3>
         <ul>

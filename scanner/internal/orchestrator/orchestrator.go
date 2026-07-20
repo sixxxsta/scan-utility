@@ -27,7 +27,7 @@ type Orchestrator struct {
 	Masscan  *masscan.Runner
 	Nmap     *nmap.Runner
 	CVE      *cve.Client
-	Exploit  *exploitdb.Matcher
+	Exploit  *exploitdb.Client
 	ASN      *asn.Resolver
 	Notify   *notify.Fanout
 
@@ -42,7 +42,7 @@ func New(cfg *config.Config, st *store.Store) (*Orchestrator, error) {
 		Cfg:     cfg,
 		Store:   st,
 		Masscan: &masscan.Runner{Cfg: cfg.Masscan},
-		Nmap:    &nmap.Runner{Cfg: cfg.Nmap},
+		Nmap:    &nmap.Runner{Cfg: cfg.Nmap, NSE: cfg.NSE},
 		ASN:     asn.New(),
 		Notify:  notify.NewFanout(cfg, st),
 	}
@@ -50,11 +50,7 @@ func New(cfg *config.Config, st *store.Store) (*Orchestrator, error) {
 		o.CVE = cve.New(cfg.Vulners, cfg.Env(cfg.Vulners.APIKeyEnv))
 	}
 	if cfg.ExploitDB.Enabled {
-		m, err := exploitdb.Load(cfg.ExploitDB.IndexPath)
-		if err != nil {
-			log.Printf("exploitdb: %v", err)
-		}
-		o.Exploit = m
+		o.Exploit = exploitdb.New(cfg.ExploitDB)
 	}
 	return o, nil
 }
@@ -215,6 +211,17 @@ func (o *Orchestrator) enrichAll(ctx context.Context, items []models.Finding) ([
 					f = nf
 				}
 			}
+			if o.Nmap != nil && o.Cfg.NSE.Enabled {
+				vf, err := o.Nmap.Validate(ctx, f)
+				if err != nil {
+					enrichErr = joinErr(enrichErr, err)
+					f = vf
+				} else {
+					f = vf
+				}
+			} else if f.ValidationStatus == "" {
+				f.ValidationStatus = models.ValidationNone
+			}
 			if o.CVE != nil && o.Cfg.Vulners.Enabled {
 				cves, err := o.CVE.Lookup(ctx, f.Product, f.Version)
 				if err != nil {
@@ -225,9 +232,13 @@ func (o *Orchestrator) enrichAll(ctx context.Context, items []models.Finding) ([
 				}
 			}
 			if o.Exploit != nil && o.Cfg.ExploitDB.Enabled {
-				exps := o.Exploit.Match(f)
-				f.Exploits = exps
-				_ = o.Store.SaveExploits(ctx, f.ID, exps)
+				exps, err := o.Exploit.Match(ctx, f)
+				if err != nil {
+					enrichErr = joinErr(enrichErr, err)
+				} else {
+					f.Exploits = exps
+					_ = o.Store.SaveExploits(ctx, f.ID, exps)
+				}
 			}
 			f.LastSeen = time.Now().UTC()
 			_ = o.Store.UpdateFindingEnrichment(ctx, f)
