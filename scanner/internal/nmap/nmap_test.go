@@ -30,6 +30,31 @@ func TestApplyXML(t *testing.T) {
 	}
 }
 
+func TestParseDiscoverXML(t *testing.T) {
+	xml := []byte(`<?xml version="1.0"?>
+<nmaprun>
+  <host>
+    <address addr="192.168.1.157" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="8088">
+        <state state="open"/>
+        <service name="http"/>
+      </port>
+      <port protocol="tcp" portid="22">
+        <state state="closed"/>
+      </port>
+    </ports>
+  </host>
+</nmaprun>`)
+	got, err := nmap.ParseDiscoverXML(xml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].IP != "192.168.1.157" || got[0].Port != 8088 {
+		t.Fatalf("unexpected: %+v", got)
+	}
+}
+
 func TestApplyNSEXMLValidated(t *testing.T) {
 	xml := []byte(`<?xml version="1.0"?>
 <nmaprun>
@@ -79,12 +104,12 @@ func TestSelectScripts(t *testing.T) {
 	}
 	found := false
 	for _, s := range got {
-		if s == "http-vuln*" {
+		if s == "http-title" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("want http-vuln* in %v", got)
+		t.Fatalf("want http-title in %v", got)
 	}
 
 	got = nmap.SelectScripts(config.NSEConfig{Enabled: true, Auto: &auto}, models.Finding{Port: 22})

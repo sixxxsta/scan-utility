@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"log"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -60,8 +61,9 @@ func (r *Runner) Enrich(ctx context.Context, f models.Finding) (models.Finding, 
 		return f, nil
 	}
 	args := append([]string{}, r.Cfg.Args...)
-	args = append(args, "-p", strconv.Itoa(f.Port), "-oX", "-", f.IP)
+	args = append(args, "-sT", "-p", strconv.Itoa(f.Port), "-oX", "-", f.IP)
 
+	log.Printf("nmap enrich %s:%d", f.IP, f.Port)
 	cmd := exec.CommandContext(ctx, r.Cfg.Path, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -69,7 +71,12 @@ func (r *Runner) Enrich(ctx context.Context, f models.Finding) (models.Finding, 
 	if err := cmd.Run(); err != nil {
 		return f, fmt.Errorf("nmap: %w (%s)", err, strings.TrimSpace(stderr.String()))
 	}
-	return ApplyXML(f, stdout.Bytes())
+	out, err := ApplyXML(f, stdout.Bytes())
+	if err != nil {
+		return f, err
+	}
+	log.Printf("nmap enrich done %s:%d service=%s product=%s %s", out.IP, out.Port, out.Service, out.Product, out.Version)
+	return out, nil
 }
 
 func (r *Runner) Validate(ctx context.Context, f models.Finding) (models.Finding, error) {
@@ -88,11 +95,13 @@ func (r *Runner) Validate(ctx context.Context, f models.Finding) (models.Finding
 
 	args := []string{
 		"-Pn",
+		"-sT",
 		"--script", strings.Join(scripts, ","),
 		"-p", strconv.Itoa(f.Port),
 		"-oX", "-",
 		f.IP,
 	}
+	log.Printf("nmap nse %s:%d scripts=%s", f.IP, f.Port, f.NSEScripts)
 	cmd := exec.CommandContext(ctx, r.Cfg.Path, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -102,21 +111,116 @@ func (r *Runner) Validate(ctx context.Context, f models.Finding) (models.Finding
 		f.NSEOutput = truncate(strings.TrimSpace(stderr.String()), 2000)
 		return f, fmt.Errorf("nmap nse: %w (%s)", err, f.NSEOutput)
 	}
-	return ApplyNSEXML(f, stdout.Bytes())
+	out, err := ApplyNSEXML(f, stdout.Bytes())
+	if err != nil {
+		return f, err
+	}
+	log.Printf("nmap nse done %s:%d status=%s", out.IP, out.Port, out.ValidationStatus)
+	return out, nil
+}
+
+func (r *Runner) Discover(ctx context.Context, targets []string, ports string) ([]models.Finding, error) {
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("no targets")
+	}
+	if strings.TrimSpace(ports) == "" {
+		return nil, fmt.Errorf("no ports")
+	}
+	args := []string{"-Pn", "-sT", "-p", ports, "--open", "-oX", "-"}
+	args = append(args, targets...)
+	log.Printf("nmap discover targets=%v ports=%s", targets, ports)
+	cmd := exec.CommandContext(ctx, r.Cfg.Path, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if stdout.Len() == 0 {
+			return nil, fmt.Errorf("nmap discover: %w (%s)", err, strings.TrimSpace(stderr.String()))
+		}
+	}
+	findings, err := ParseDiscoverXML(stdout.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("nmap discover done findings=%d", len(findings))
+	return findings, nil
+}
+
+func ParseDiscoverXML(data []byte) ([]models.Finding, error) {
+	var run nmapRun
+	if err := xml.Unmarshal(data, &run); err != nil {
+		return nil, err
+	}
+	var out []models.Finding
+	for _, h := range run.Hosts {
+		ip := ""
+		for _, a := range h.Addresses {
+			if a.AddrType == "ipv4" || a.AddrType == "ipv6" || ip == "" {
+				ip = a.Addr
+				if a.AddrType == "ipv4" {
+					break
+				}
+			}
+		}
+		if ip == "" {
+			continue
+		}
+		for _, p := range h.Ports.Port {
+			if p.State.State != "" && p.State.State != "open" {
+				continue
+			}
+			port, err := strconv.Atoi(p.PortID)
+			if err != nil {
+				continue
+			}
+			proto := p.Protocol
+			if proto == "" {
+				proto = "tcp"
+			}
+			svc := p.Service.Name
+			product := p.Service.Product
+			version := p.Service.Version
+			ban := strings.TrimSpace(strings.Join([]string{p.Service.Product, p.Service.Version, p.Service.Extra, p.Service.Banner}, " "))
+			if product == "" || version == "" {
+				ns, np, nv := banner.Normalize(svc, ban)
+				if svc == "" {
+					svc = ns
+				}
+				if product == "" {
+					product = np
+				}
+				if version == "" {
+					version = nv
+				}
+			}
+			out = append(out, models.Finding{
+				IP:      ip,
+				Port:    port,
+				Proto:   proto,
+				State:   "open",
+				IsOpen:  true,
+				Service: svc,
+				Banner:  ban,
+				Product: product,
+				Version: version,
+			})
+		}
+	}
+	return out, nil
 }
 
 func DefaultProfiles() map[string][]string {
 	return map[string][]string{
-		"http":  {"http-vuln*", "http-slowloris-check"},
-		"https": {"http-vuln*", "ssl-*"},
-		"ssl":   {"ssl-*"},
-		"ssh":   {"ssh2-enum-algos", "ssh-auth-methods", "ssh-*"},
-		"ftp":   {"ftp-*"},
-		"smtp":  {"smtp-*"},
-		"mysql": {"mysql-*"},
-		"redis": {"redis-*"},
-		"rdp":   {"rdp-*"},
-		"smb":   {"smb-vuln*", "smb-*"},
+		"http":  {"http-title", "http-methods"},
+		"https": {"http-title", "ssl-cert", "ssl-enum-ciphers"},
+		"ssl":   {"ssl-cert", "ssl-enum-ciphers"},
+		"ssh":   {"ssh2-enum-algos", "ssh-auth-methods", "ssh-hostkey"},
+		"ftp":   {"ftp-anon", "ftp-syst"},
+		"smtp":  {"smtp-commands", "smtp-open-relay"},
+		"mysql": {"mysql-info", "mysql-empty-password"},
+		"redis": {"redis-info"},
+		"rdp":   {"rdp-enum-encryption", "rdp-ntlm-info"},
+		"smb":   {"smb-os-discovery", "smb-security-mode"},
 	}
 }
 

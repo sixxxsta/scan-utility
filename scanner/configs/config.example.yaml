@@ -10,6 +10,7 @@ masscan:
   rate: 1000
   banners: true
   wait: 10
+  fallback_nmap: true
 
 nmap:
   enabled: true
@@ -38,12 +39,12 @@ notifications:
       - "owner@example.com"
 
 vulners:
-  enabled: false
+  enabled: true
   api_key_env: "VULNERS_API_KEY"
   base_url: "https://vulners.com/api/v3"
 
 exploitdb:
-  enabled: false
+  enabled: true
   path: "searchsploit"
   max_results: 5
 

@@ -49,13 +49,16 @@ func usage() {
 	fmt.Fprintf(os.Stderr, `scanutil — masscan wrapper
 
 Usage:
-  scanutil scan    -c config.yaml
-  scanutil serve   -c config.yaml [-web web]
-  scanutil migrate -c config.yaml
+  scanutil scan    -c config.yaml [-env .env]
+  scanutil serve   -c config.yaml [-env .env] [-web web]
+  scanutil migrate -c config.yaml [-env .env]
 `)
 }
 
-func loadStore(cfgPath string) (*config.Config, *store.Store, error) {
+func loadStore(cfgPath, envPath string) (*config.Config, *store.Store, error) {
+	if err := config.LoadDotEnv(envPath); err != nil {
+		return nil, nil, err
+	}
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return nil, nil, err
@@ -70,9 +73,10 @@ func loadStore(cfgPath string) (*config.Config, *store.Store, error) {
 func runScan(args []string) {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	cfgPath := fs.String("c", "configs/config.yaml", "path to config file")
+	envPath := fs.String("env", ".env", "path to dotenv file")
 	_ = fs.Parse(args)
 
-	cfg, st, err := loadStore(*cfgPath)
+	cfg, st, err := loadStore(*cfgPath, *envPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -95,7 +99,12 @@ func runScan(args []string) {
 func runMigrate(args []string) {
 	fs := flag.NewFlagSet("migrate", flag.ExitOnError)
 	cfgPath := fs.String("c", "configs/config.yaml", "path to config file")
+	envPath := fs.String("env", ".env", "path to dotenv file")
 	_ = fs.Parse(args)
+
+	if err := config.LoadDotEnv(*envPath); err != nil {
+		log.Fatal(err)
+	}
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
@@ -119,10 +128,11 @@ func runMigrate(args []string) {
 func runServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	cfgPath := fs.String("c", "configs/config.yaml", "path to config file")
+	envPath := fs.String("env", ".env", "path to dotenv file")
 	webDir := fs.String("web", "web", "path to web templates/static")
 	_ = fs.Parse(args)
 
-	cfg, st, err := loadStore(*cfgPath)
+	cfg, st, err := loadStore(*cfgPath, *envPath)
 	if err != nil {
 		log.Fatal(err)
 	}

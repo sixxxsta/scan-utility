@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,18 +58,27 @@ func (r *Runner) Scan(ctx context.Context, targets []string, ports string) ([]mo
 	}
 	args = append(args, targets...)
 
+	log.Printf("masscan start targets=%v ports=%s rate=%d banners=%v wait=%d",
+		targets, ports, r.Cfg.Rate, r.Cfg.Banners, r.Cfg.Wait)
+
 	cmd := exec.CommandContext(ctx, r.Cfg.Path, args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	cmd.Stdout = &stderr
+	var captured bytes.Buffer
+	cmd.Stderr = io.MultiWriter(os.Stderr, &captured)
+	cmd.Stdout = io.MultiWriter(os.Stderr, &captured)
 
 	if err := cmd.Run(); err != nil {
 		if _, statErr := os.Stat(outFile); statErr != nil {
-			return nil, fmt.Errorf("masscan failed: %w; stderr: %s", err, stderr.String())
+			return nil, fmt.Errorf("masscan failed: %w; stderr: %s", err, captured.String())
 		}
+		log.Printf("masscan exited with %v but output exists, continuing", err)
 	}
 
-	return ParseJSONFile(outFile)
+	findings, err := ParseJSONFile(outFile)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("masscan done findings=%d", len(findings))
+	return findings, nil
 }
 
 func ParseJSONFile(path string) ([]models.Finding, error) {

@@ -31,10 +31,11 @@ type TargetsConfig struct {
 }
 
 type MasscanConfig struct {
-	Path    string `yaml:"path"`
-	Rate    int    `yaml:"rate"`
-	Banners bool   `yaml:"banners"`
-	Wait    int    `yaml:"wait"`
+	Path         string `yaml:"path"`
+	Rate         int    `yaml:"rate"`
+	Banners      bool   `yaml:"banners"`
+	Wait         int    `yaml:"wait"`
+	FallbackNmap bool   `yaml:"fallback_nmap"`
 }
 
 type NmapConfig struct {
@@ -120,10 +121,11 @@ func Default() *Config {
 	return &Config{
 		Ports: "22,80,443,3306,8080",
 		Masscan: MasscanConfig{
-			Path:    "masscan",
-			Rate:    1000,
-			Banners: true,
-			Wait:    10,
+			Path:         "masscan",
+			Rate:         1000,
+			Banners:      true,
+			Wait:         10,
+			FallbackNmap: true,
 		},
 		Nmap: NmapConfig{
 			Enabled: true,

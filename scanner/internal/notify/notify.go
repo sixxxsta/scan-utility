@@ -3,6 +3,8 @@ package notify
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"net/smtp"
 	"net/url"
@@ -31,6 +33,8 @@ func NewFanout(cfg *config.Config, st *store.Store) *Fanout {
 		chat := cfg.Env(cfg.Notifications.Telegram.ChatIDEnv)
 		if token != "" && chat != "" {
 			ns = append(ns, &Telegram{Token: token, ChatID: chat, Client: &http.Client{Timeout: 15 * time.Second}})
+		} else {
+			log.Printf("telegram enabled but %s/%s empty", cfg.Notifications.Telegram.BotTokenEnv, cfg.Notifications.Telegram.ChatIDEnv)
 		}
 	}
 	if cfg.Notifications.Email.Enabled {
@@ -44,6 +48,7 @@ func NewFanout(cfg *config.Config, st *store.Store) *Fanout {
 			To:       cfg.Notifications.Email.To,
 		})
 	}
+	log.Printf("notifiers ready: %d", len(ns))
 	return &Fanout{notifiers: ns, store: st}
 }
 
@@ -151,8 +156,9 @@ func (t *Telegram) Notify(ctx context.Context, _ models.Finding, text string) er
 		return err
 	}
 	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("telegram status %d", resp.StatusCode)
+		return fmt.Errorf("telegram status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return nil
 }

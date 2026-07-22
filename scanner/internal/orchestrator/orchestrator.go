@@ -47,7 +47,12 @@ func New(cfg *config.Config, st *store.Store) (*Orchestrator, error) {
 		Notify:  notify.NewFanout(cfg, st),
 	}
 	if cfg.Vulners.Enabled {
-		o.CVE = cve.New(cfg.Vulners, cfg.Env(cfg.Vulners.APIKeyEnv))
+		key := cfg.Env(cfg.Vulners.APIKeyEnv)
+		if key == "" {
+			log.Printf("vulners enabled but %s empty", cfg.Vulners.APIKeyEnv)
+		} else {
+			o.CVE = cve.New(cfg.Vulners, key)
+		}
 	}
 	if cfg.ExploitDB.Enabled {
 		o.Exploit = exploitdb.New(cfg.ExploitDB)
@@ -90,6 +95,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*models.ScanRun, error) {
 	if len(targets) == 0 {
 		return nil, fmt.Errorf("no targets resolved")
 	}
+	log.Printf("targets=%v ports=%s", targets, o.Cfg.Ports)
 
 	run, err := o.Store.CreateRun(ctx, strings.Join(targets, ","), o.Cfg.Ports)
 	if err != nil {
@@ -112,9 +118,20 @@ func (o *Orchestrator) Run(ctx context.Context) (*models.ScanRun, error) {
 			_ = o.Store.FinishRun(ctx, run)
 			return run, err
 		}
+		if len(findings) == 0 && o.Cfg.Masscan.FallbackNmap && o.Cfg.Nmap.Enabled && o.Nmap != nil {
+			o.setMessage("nmap-discover")
+			log.Printf("masscan found nothing, falling back to nmap discover")
+			nf, nerr := o.Nmap.Discover(ctx, targets, o.Cfg.Ports)
+			if nerr != nil {
+				log.Printf("nmap discover: %v", nerr)
+			} else {
+				findings = nf
+			}
+		}
 	}
 
 	o.setMessage("diff")
+	log.Printf("diff against previous results (%d current findings)", len(findings))
 	diffed, err := o.Store.DiffAndUpsert(ctx, findings)
 	if err != nil {
 		run.Status = models.ScanStatusFailed
@@ -138,6 +155,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*models.ScanRun, error) {
 			run.ClosedCount++
 		}
 	}
+	log.Printf("diff done open=%d new=%d closed=%d enrich=%d", run.OpenCount, run.NewCount, run.ClosedCount, len(toEnrich))
 
 	o.setMessage("enrich")
 	enriched, err := o.enrichAll(ctx, toEnrich)
@@ -146,9 +164,13 @@ func (o *Orchestrator) Run(ctx context.Context) (*models.ScanRun, error) {
 	}
 
 	o.setMessage("notify")
+	log.Printf("notify %d findings (telegram=%v email=%v)", len(enriched),
+		o.Cfg.Notifications.Telegram.Enabled, o.Cfg.Notifications.Email.Enabled)
 	for _, f := range enriched {
 		if err := o.Notify.Send(ctx, f, o.Cfg.NotifyClosed); err != nil {
 			log.Printf("notify: %v", err)
+		} else {
+			log.Printf("notify ok %s diff=%s", f.Key(), f.Diff)
 		}
 	}
 	if o.Cfg.NotifyClosed {
@@ -226,9 +248,11 @@ func (o *Orchestrator) enrichAll(ctx context.Context, items []models.Finding) ([
 				cves, err := o.CVE.Lookup(ctx, f.Product, f.Version)
 				if err != nil {
 					enrichErr = joinErr(enrichErr, err)
+					log.Printf("vulners %s: %v", f.Key(), err)
 				} else {
 					f.CVEs = cves
 					_ = o.Store.SaveCVEs(ctx, f.ID, cves)
+					log.Printf("vulners %s product=%q version=%q cves=%d", f.Key(), f.Product, f.Version, len(cves))
 				}
 			}
 			if o.Exploit != nil && o.Cfg.ExploitDB.Enabled {
@@ -238,6 +262,7 @@ func (o *Orchestrator) enrichAll(ctx context.Context, items []models.Finding) ([
 				} else {
 					f.Exploits = exps
 					_ = o.Store.SaveExploits(ctx, f.ID, exps)
+					log.Printf("exploitdb %s product=%q version=%q matches=%d", f.Key(), f.Product, f.Version, len(exps))
 				}
 			}
 			f.LastSeen = time.Now().UTC()
