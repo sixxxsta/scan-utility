@@ -2,6 +2,37 @@
 
 Обёртка над masscan: сканит диапазоны/ASN, смотрит открытые порты, через nmap уточняет сервис, сравнивает с прошлой БД, шлёт алерты в Telegram/email. По желанию — searchsploit, Vulners, веб-дашборд, cron.
 
+## Download
+
+Готовый архив: [Releases](https://github.com/sixxxsta/scan-utility/releases) → `scanutil-linux-amd64.tar.gz`.
+
+```bash
+tar xzf scanutil-linux-amd64.tar.gz
+cd scanutil-linux-amd64
+cp configs/config.example.yaml configs/config.yaml
+cp .env.example .env
+# targets/ports в config.yaml; секреты в .env
+sudo ./scanutil scan -c configs/config.yaml -env .env
+```
+
+### Зависимости на хосте
+
+- **nmap** — обязательно (сервисы / NSE)
+- **searchsploit** (`apt install exploitdb`) — для блока Exploits
+- **sudo** — для masscan
+
+### API / боты (полная работа)
+
+В `.env`:
+
+| Переменная | Откуда |
+|------------|--------|
+| `TELEGRAM_BOT_TOKEN` | [@BotFather](https://t.me/BotFather) |
+| `TELEGRAM_CHAT_ID` | id чата (бот должен быть добавлен в чат) |
+| `VULNERS_API_KEY` | [vulners.com](https://vulners.com) |
+
+В `config.yaml` включи `notifications.telegram.enabled`, `vulners.enabled`, `exploitdb.enabled` (см. корневой README).
+
 ## Сборка
 
 ```bash
@@ -13,25 +44,17 @@ cd scanner
 go build -o ../bin/scanutil ./cmd/scanutil
 ```
 
-Нужны: `masscan`, `nmap`, опционально `searchsploit`. Запуск masscan — от root/sudo.
-
 ## Конфиг
 
 `configs/config.example.yaml` → `configs/config.yaml`  
-Секреты в `.env` (пример: `.env.example`):
-
-```
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
-VULNERS_API_KEY=...
-```
+Секреты в `.env` (пример: `.env.example`).
 
 ## Команды
 
 ```bash
 cd scanner
-sudo ../bin/scanutil scan -c configs/config.yaml
-../bin/scanutil serve -c configs/config.yaml   # http://127.0.0.1:8080
+sudo ../bin/scanutil scan -c configs/config.yaml -env .env
+../bin/scanutil serve -c configs/config.yaml -env .env   # http://127.0.0.1:8080
 ```
 
 На localhost/docker masscan часто пустой — в конфиге есть `masscan.fallback_nmap`.
